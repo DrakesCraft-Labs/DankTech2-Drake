@@ -14,8 +14,8 @@ import io.github.sefiraat.danktech2.theme.ThemeType;
 import io.github.sefiraat.danktech2.utils.Keys;
 import io.github.sefiraat.danktech2.utils.datatypes.DataTypeMethods;
 import io.github.sefiraat.danktech2.utils.datatypes.PersistentDankInstanceType;
-import io.github.thebusybiscuit.slimefun4.api.SlimefunAddon;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.updater.GitHubBuildsUpdater;
+import com.github.drakescraft_labs.slimefun4.api.SlimefunAddon;
+import com.github.drakescraft_labs.slimefun4.libraries.dough.updater.GitHubBuildsUpdater;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.AdvancedPie;
 import org.bukkit.inventory.ItemStack;
@@ -74,7 +74,10 @@ public class DankTech2 extends JavaPlugin implements SlimefunAddon {
 
     @Override
     public void onDisable() {
-        this.configManager.saveAll();
+        // Paper can invoke disable after a failed enable; nothing was initialized yet.
+        if (this.configManager != null) {
+            this.configManager.saveAll();
+        }
     }
 
     public void tryUpdate() {

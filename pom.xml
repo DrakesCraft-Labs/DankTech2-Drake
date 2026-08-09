@@ -110,10 +110,11 @@
             <version>1.19-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
-            <groupId>com.github.Slimefun</groupId>
-            <artifactId>Slimefun4</artifactId>
-            <version>RC-35</version>
+            <groupId>com.github.drakescraft_labs</groupId>
+            <artifactId>slimefun-core</artifactId>
+            <version>11.0-Drake-1.21.11-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 
