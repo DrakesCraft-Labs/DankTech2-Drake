@@ -1,6 +1,7 @@
 package io.github.sefiraat.danktech2.managers;
 
 import io.github.sefiraat.danktech2.DankTech2;
+import io.github.sefiraat.danktech2.listeners.GuiIntegrityListener;
 import io.github.sefiraat.danktech2.listeners.PackListener;
 import io.github.sefiraat.danktech2.listeners.PickupListener;
 import org.bukkit.event.Listener;
@@ -8,6 +9,7 @@ import org.bukkit.event.Listener;
 public class ListenerManager {
 
     public ListenerManager() {
+        addListener(new GuiIntegrityListener());
         addListener(new PickupListener());
         addListener(new PackListener());
     }

@@ -1,8 +1,8 @@
 package io.github.sefiraat.danktech2.utils.datatypes;
 
-import de.jeff_media.morepersistentdatatypes.DataType;
 import io.github.sefiraat.danktech2.core.DankPackInstance;
 import io.github.sefiraat.danktech2.core.TrashPackInstance;
+import io.github.sefiraat.danktech2.morepersistentdatatypes.DataType;
 import io.github.sefiraat.danktech2.utils.Keys;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
