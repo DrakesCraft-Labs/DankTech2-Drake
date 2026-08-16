@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/DrakesCraft-Labs/DankTech2-Drake/master/banner.svg" width="100%" alt="DankTech2 Drake animated banner" />
+</p>
+
 # DankTech2
 <img src="https://github.com/Sefiraat/DankTech2/blob/master/images/logo/logo_large.png">
 
