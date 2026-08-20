@@ -88,19 +88,17 @@ jobs:
 
       - name: Compilar
         run: |
-          set -euo pipefail
           if [ -f pom.xml ]; then
+            echo "Compilando con Maven"
             mvn -B -ntp package -DskipTests
           elif [ -f gradlew ]; then
+            echo "Compilando con Gradle Wrapper"
             chmod +x gradlew
-            ./gradlew build -x test --no-daemon
+            ./gradlew build -x test
           elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then
-            gradle build -x test --no-daemon
-          else
-            echo "No se encontro build descriptor (pom.xml ni build.gradle)"
-            exit 1
+            echo "Compilando con Gradle"
+            gradle build -x test
           fi
-
       - name: Localizar el jar
         id: jar
         run: |
