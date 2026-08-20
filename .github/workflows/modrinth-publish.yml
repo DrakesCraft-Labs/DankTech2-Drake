@@ -86,6 +86,30 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Clonar dependencias DrakesCraft Maven Repo
+        run: |
+          mkdir -p ~/.m2/repository
+          git clone --depth 1 https://github.com/DrakesCraft-Labs/maven-repo.git /tmp/drakes-maven-repo
+          cp -rn /tmp/drakes-maven-repo/com ~/.m2/repository/ || true
+          python3 -c "
+          import os, shutil
+          repo = os.path.expanduser('~/.m2/repository/com/github/drakescraft_labs')
+          if os.path.exists(repo):
+              for d in os.listdir(repo):
+                  dp = os.path.join(repo, d)
+                  if os.path.isdir(dp):
+                      for v in list(os.listdir(dp)):
+                          vp = os.path.join(dp, v)
+                          if os.path.isdir(vp) and not v.endswith('-SNAPSHOT'):
+                              snap_v = v + '-SNAPSHOT'
+                              snap_p = os.path.join(dp, snap_v)
+                              if not os.path.exists(snap_p):
+                                  shutil.copytree(vp, snap_p)
+                                  for f in os.listdir(snap_p):
+                                      if v in f:
+                                          os.rename(os.path.join(snap_p, f), os.path.join(snap_p, f.replace(v, snap_v)))
+          "
+
       - name: Compilar
         run: |
           if [ -f pom.xml ]; then
