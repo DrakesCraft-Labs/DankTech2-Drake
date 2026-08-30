@@ -66,6 +66,17 @@ public class PickupListener implements Listener {
         final ItemStack itemStack = item.getItemStack();
         final DankPackInstance instance = DataTypeMethods.getCustom(packMeta, Keys.DANK_INSTANCE, PersistentDankInstanceType.TYPE);
 
+        if (instance == null) {
+            // Pack sin datos de instancia validos: mismo tratamiento que un pack
+            // duplicado/borrado, en vez de NPE en getId().
+            player.sendMessage(MessageFormat.format(
+                "{0}A Dank Pack you have has been duped or deleted. Removing",
+                ThemeType.ERROR.getColor())
+            );
+            pack.setAmount(0);
+            return;
+        }
+
         if (ConfigManager.getInstance().checkDankDeletion(instance.getId())) {
             player.sendMessage(MessageFormat.format(
                 "{0}A Dank Pack you have has been duped or deleted. Removing",
@@ -121,6 +132,11 @@ public class PickupListener implements Listener {
 
         final ItemStack itemStack = item.getItemStack();
         final TrashPackInstance instance = DataTypeMethods.getCustom(packMeta, Keys.TRASH_INSTANCE, PersistentTrashInstanceType.TYPE);
+
+        if (instance == null) {
+            // Mismo caso que DankPackInstance nula: pack sin datos validos, no hay nada que vaciar.
+            return;
+        }
 
         for (int i = 0; i < trashPack.getSlots(); i++) {
             final ItemStack testStack = instance.getItem(i);
