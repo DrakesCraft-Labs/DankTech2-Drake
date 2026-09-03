@@ -20,6 +20,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.text.MessageFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class DankGUI extends ChestMenu {
 
@@ -117,24 +119,31 @@ public class DankGUI extends ChestMenu {
     }
 
     private boolean setNewItem(Player player, int instanceSlot) {
-        loadInstance();
+        if (!loadInstance()) {
+            return abortInvalidPack(player);
+        }
         ItemStack heldItem = player.getItemOnCursor();
         if (heldItem.getType() != Material.AIR
             && allowedInDank(heldItem)
         ) {
             ItemStack clone = heldItem.clone();
             clone.setAmount(1);
-            heldItem.setAmount(heldItem.getAmount() - 1);
             this.packInstance.setItem(instanceSlot, clone);
             this.packInstance.setAmount(instanceSlot, 1);
-            saveInstance();
+            // Solo se consume del cursor si el pack pudo persistirse.
+            if (!saveInstance()) {
+                return abortInvalidPack(player);
+            }
+            heldItem.setAmount(heldItem.getAmount() - 1);
             setupAllItems();
         }
         return false;
     }
 
     private boolean addToExistingItem(Player player, int instanceSlot) {
-        loadInstance();
+        if (!loadInstance()) {
+            return abortInvalidPack(player);
+        }
         ItemStack heldItem = player.getItemOnCursor();
         int maxAmount = this.dankPack.getCapacityPerSlot().getValue();
         int currentAmount = this.packInstance.getAmount(instanceSlot);
@@ -142,18 +151,26 @@ public class DankGUI extends ChestMenu {
         if (heldItem.getType() != Material.AIR && heldItem.isSimilar(instanceStack)) {
             ItemStack clone = heldItem.clone();
             long total = (long) currentAmount + clone.getAmount();
-            if (total <= maxAmount) {
-                heldItem.setAmount(0);
+            final boolean fits = total <= maxAmount;
+            if (fits) {
                 this.packInstance.setAmount(instanceSlot, (int) total);
             }
-            saveInstance();
+            // Solo se vacia el cursor si el pack pudo persistirse.
+            if (!saveInstance()) {
+                return abortInvalidPack(player);
+            }
+            if (fits) {
+                heldItem.setAmount(0);
+            }
             setupAllItems();
         }
         return false;
     }
 
     private boolean interactWithItem(Player player, ClickAction clickAction, int instanceSlot) {
-        loadInstance();
+        if (!loadInstance()) {
+            return abortInvalidPack(player);
+        }
 
         if (clickAction.isShiftClicked()) {
             if (clickAction.isRightClicked()) {
@@ -174,26 +191,32 @@ public class DankGUI extends ChestMenu {
 
     private void withdrawOne(Player player, int instanceSlot) {
         int firstEmpty = player.getInventory().firstEmpty();
-        if (firstEmpty != -1) {
+        final ItemStack storedStack = this.packInstance.getItem(instanceSlot);
+        if (firstEmpty != -1 && storedStack != null) {
             final int amount = this.packInstance.getAmount(instanceSlot);
-            final ItemStack itemToWithdraw = this.packInstance.getItem(instanceSlot).clone();
+            final ItemStack itemToWithdraw = storedStack.clone();
             itemToWithdraw.setAmount(1);
             if (amount == 1) {
                 this.packInstance.clearItem(instanceSlot);
             } else {
                 this.packInstance.setAmount(instanceSlot, amount - 1);
             }
+            // Se entrega solo si el descuento quedo persistido, para no duplicar.
+            if (!saveInstance()) {
+                abortInvalidPack(player);
+                return;
+            }
             player.getInventory().addItem(itemToWithdraw);
-            saveInstance();
             setupAllItems();
         }
     }
 
     private void withdrawStack(Player player, int instanceSlot) {
         int firstEmpty = player.getInventory().firstEmpty();
-        if (firstEmpty != -1) {
+        final ItemStack storedStack = this.packInstance.getItem(instanceSlot);
+        if (firstEmpty != -1 && storedStack != null) {
             final int amount = this.packInstance.getAmount(instanceSlot);
-            final ItemStack itemToWithdraw = this.packInstance.getItem(instanceSlot).clone();
+            final ItemStack itemToWithdraw = storedStack.clone();
             final int maxStackSize = itemToWithdraw.getMaxStackSize();
             if (amount <= maxStackSize) {
                 itemToWithdraw.setAmount(amount - 1);
@@ -202,16 +225,28 @@ public class DankGUI extends ChestMenu {
                 itemToWithdraw.setAmount(maxStackSize);
                 this.packInstance.setAmount(instanceSlot, amount - maxStackSize);
             }
+            // Se entrega solo si el descuento quedo persistido, para no duplicar.
+            if (!saveInstance()) {
+                abortInvalidPack(player);
+                return;
+            }
             player.getInventory().addItem(itemToWithdraw);
-            saveInstance();
             setupAllItems();
         }
     }
 
     private void depositAll(Player player, int instanceSlot) {
         final int maxAmount = this.dankPack.getCapacityPerSlot().getValue();
-        final ItemStack itemToDeposit = this.packInstance.getItem(instanceSlot).clone();
+        final ItemStack storedStack = this.packInstance.getItem(instanceSlot);
+        if (storedStack == null) {
+            setupAllItems();
+            return;
+        }
+        final ItemStack itemToDeposit = storedStack.clone();
 
+        // Los descuentos del inventario se calculan primero y se aplican despues de
+        // guardar, para no consumir items del jugador si el pack no puede persistirse.
+        final Map<ItemStack, Integer> pendingAmounts = new LinkedHashMap<>();
         for (ItemStack testItem : player.getInventory().getStorageContents()) {
             if (testItem != null && testItem.isSimilar(itemToDeposit)) {
                 int amount = this.packInstance.getAmount(instanceSlot);
@@ -219,22 +254,29 @@ public class DankGUI extends ChestMenu {
                 long testAmount = (long) amount + inAmount;
                 if (testAmount > maxAmount) {
                     this.packInstance.setAmount(instanceSlot, maxAmount);
-                    testItem.setAmount((int) (testAmount - maxAmount));
+                    pendingAmounts.put(testItem, (int) (testAmount - maxAmount));
                     break;
                 } else {
                     this.packInstance.setAmount(instanceSlot, (int) testAmount);
-                    testItem.setAmount(0);
+                    pendingAmounts.put(testItem, 0);
                 }
             }
         }
-        saveInstance();
+        if (!saveInstance()) {
+            abortInvalidPack(player);
+            return;
+        }
+        for (Map.Entry<ItemStack, Integer> entry : pendingAmounts.entrySet()) {
+            entry.getKey().setAmount(entry.getValue());
+        }
         setupAllItems();
     }
 
     private void withdrawMax(Player player, int instanceSlot) {
         final int firstEmpty = player.getInventory().firstEmpty();
-        if (firstEmpty != -1) {
-            final ItemStack itemToWithdraw = this.packInstance.getItem(instanceSlot).clone();
+        final ItemStack storedStack = this.packInstance.getItem(instanceSlot);
+        if (firstEmpty != -1 && storedStack != null) {
+            final ItemStack itemToWithdraw = storedStack.clone();
             final int maxStackSize = itemToWithdraw.getMaxStackSize();
             int freeSlots = GeneralUtils.getEmptySlots(player);
             int amount = this.packInstance.getAmount(instanceSlot);
@@ -247,6 +289,12 @@ public class DankGUI extends ChestMenu {
             itemToWithdraw.setAmount(withdrawAmount);
             this.packInstance.setAmount(instanceSlot, amount - withdrawAmount);
 
+            // Se entrega solo si el descuento quedo persistido, para no duplicar.
+            if (!saveInstance()) {
+                abortInvalidPack(player);
+                return;
+            }
+
             do {
                 ItemStack giveItem = itemToWithdraw.clone();
                 giveItem.setAmount(Math.min(itemToWithdraw.getAmount(), itemToWithdraw.getMaxStackSize()));
@@ -256,7 +304,6 @@ public class DankGUI extends ChestMenu {
                 itemToWithdraw.getAmount() > 0
             );
 
-            saveInstance();
             setupAllItems();
         }
     }
@@ -268,16 +315,37 @@ public class DankGUI extends ChestMenu {
         super.open(players);
     }
 
-    private void loadInstance() {
-        this.packInstance = DataTypeMethods.getCustom(
-            this.itemStack.getItemMeta(),
+    /**
+     * Recarga la instancia desde el PDC del pack. Devuelve false si el pack ya no
+     * es un item valido (fue soltado, roto o vaciado con el menu abierto) o si
+     * perdio sus datos de instancia: en ese caso packInstance se deja intacto.
+     */
+    private boolean loadInstance() {
+        final ItemMeta itemMeta = this.itemStack.getItemMeta();
+        if (itemMeta == null) {
+            return false;
+        }
+        final DankPackInstance loaded = DataTypeMethods.getCustom(
+            itemMeta,
             Keys.DANK_INSTANCE,
             PersistentDankInstanceType.TYPE
         );
+        if (loaded == null) {
+            return false;
+        }
+        this.packInstance = loaded;
+        return true;
     }
 
-    private void saveInstance() {
+    /**
+     * Persiste la instancia en el pack. Devuelve false si el item ya no tiene meta,
+     * en cuyo caso no se ha guardado nada y quien llama no debe entregar items.
+     */
+    private boolean saveInstance() {
         ItemMeta itemMeta = this.itemStack.getItemMeta();
+        if (itemMeta == null) {
+            return false;
+        }
         DataTypeMethods.setCustom(
             itemMeta,
             Keys.DANK_INSTANCE,
@@ -286,6 +354,20 @@ public class DankGUI extends ChestMenu {
         );
         this.itemStack.setItemMeta(itemMeta);
         ConfigManager.getInstance().saveDankPack(this.itemStack);
+        return true;
+    }
+
+    /**
+     * El pack dejo de ser valido mientras el menu estaba abierto: se cierra en vez
+     * de operar sobre un estado que no se puede persistir.
+     */
+    private boolean abortInvalidPack(Player player) {
+        player.sendMessage(MessageFormat.format(
+            "{0}This Dank Pack is no longer valid. Closing.",
+            ThemeType.ERROR.getColor())
+        );
+        player.closeInventory();
+        return false;
     }
 
     public boolean allowedInDank(ItemStack itemStack) {

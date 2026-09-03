@@ -12,6 +12,7 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -82,7 +83,16 @@ public class ConfigManager {
     public void saveDankPack(ItemStack itemStack) {
         SlimefunItem slimefunItem = SlimefunItem.getByItem(itemStack);
         if (slimefunItem instanceof DankPack) {
-            DankPackInstance instance = DataTypeMethods.getCustom(itemStack.getItemMeta(), Keys.DANK_INSTANCE, PersistentDankInstanceType.TYPE);
+            final ItemMeta itemMeta = itemStack.getItemMeta();
+            if (itemMeta == null) {
+                // El pack dejo de ser un item valido: no hay instancia que guardar.
+                return;
+            }
+            DankPackInstance instance = DataTypeMethods.getCustom(itemMeta, Keys.DANK_INSTANCE, PersistentDankInstanceType.TYPE);
+            if (instance == null) {
+                // Pack sin datos de instancia validos, mismo caso que en PickupListener.
+                return;
+            }
             dankPacks.set(instance.getId() + ".last_user", instance.getLastUser());
             dankPacks.set(instance.getId() + ".item", itemStack.clone());
         }

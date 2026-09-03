@@ -94,13 +94,15 @@ public class TrashGUI extends ChestMenu {
                 addMenuClickHandler(INPUT_SLOTS[i], (p, slot, item, action) -> false);
 
                 replaceExistingItem(INTERACTION_SLOTS[i], INTERACTION_STACK);
-                addMenuClickHandler(INTERACTION_SLOTS[i], (player, i1, itemStack1, clickAction) -> interactWithItem(clickAction, finalSlot));
+                addMenuClickHandler(INTERACTION_SLOTS[i], (player, i1, itemStack1, clickAction) -> interactWithItem(player, clickAction, finalSlot));
             }
         }
     }
 
     private boolean setNewItem(Player player, int instanceSlot) {
-        loadInstance();
+        if (!loadInstance()) {
+            return abortInvalidPack(player);
+        }
         ItemStack heldItem = player.getItemOnCursor();
         if (heldItem.getType() != Material.AIR
             && allowedInTrash(heldItem)
@@ -108,36 +110,64 @@ public class TrashGUI extends ChestMenu {
             ItemStack clone = heldItem.clone();
             clone.setAmount(1);
             this.packInstance.setItem(instanceSlot, clone);
-            saveInstance();
+            if (!saveInstance()) {
+                return abortInvalidPack(player);
+            }
             setupAllItems();
         }
         return false;
     }
 
-    private boolean interactWithItem(ClickAction clickAction, int instanceSlot) {
-        loadInstance();
+    private boolean interactWithItem(Player player, ClickAction clickAction, int instanceSlot) {
+        if (!loadInstance()) {
+            return abortInvalidPack(player);
+        }
         if (!clickAction.isShiftClicked() && !clickAction.isRightClicked()) {
-            clearSlot(instanceSlot);
+            clearSlot(player, instanceSlot);
         }
         return false;
     }
 
-    private void clearSlot(int instanceSlot) {
+    private void clearSlot(Player player, int instanceSlot) {
         this.packInstance.clearItem(instanceSlot);
-        saveInstance();
+        if (!saveInstance()) {
+            abortInvalidPack(player);
+            return;
+        }
         setupAllItems();
     }
 
-    private void loadInstance() {
-        this.packInstance = DataTypeMethods.getCustom(
-            this.itemStack.getItemMeta(),
+    /**
+     * Recarga la instancia desde el PDC del pack. Devuelve false si el pack ya no
+     * es un item valido (fue soltado, roto o vaciado con el menu abierto) o si
+     * perdio sus datos de instancia: en ese caso packInstance se deja intacto.
+     */
+    private boolean loadInstance() {
+        final ItemMeta itemMeta = this.itemStack.getItemMeta();
+        if (itemMeta == null) {
+            return false;
+        }
+        final TrashPackInstance loaded = DataTypeMethods.getCustom(
+            itemMeta,
             Keys.TRASH_INSTANCE,
             PersistentTrashInstanceType.TYPE
         );
+        if (loaded == null) {
+            return false;
+        }
+        this.packInstance = loaded;
+        return true;
     }
 
-    private void saveInstance() {
+    /**
+     * Persiste la instancia en el pack. Devuelve false si el item ya no tiene meta,
+     * en cuyo caso no se ha guardado nada.
+     */
+    private boolean saveInstance() {
         ItemMeta itemMeta = this.itemStack.getItemMeta();
+        if (itemMeta == null) {
+            return false;
+        }
         DataTypeMethods.setCustom(
             itemMeta,
             Keys.TRASH_INSTANCE,
@@ -145,6 +175,20 @@ public class TrashGUI extends ChestMenu {
             packInstance
         );
         this.itemStack.setItemMeta(itemMeta);
+        return true;
+    }
+
+    /**
+     * El pack dejo de ser valido mientras el menu estaba abierto: se cierra en vez
+     * de operar sobre un estado que no se puede persistir.
+     */
+    private boolean abortInvalidPack(Player player) {
+        player.sendMessage(MessageFormat.format(
+            "{0}This Trash Pack is no longer valid. Closing.",
+            ThemeType.ERROR.getColor())
+        );
+        player.closeInventory();
+        return false;
     }
 
     public boolean allowedInTrash(ItemStack itemStack) {
